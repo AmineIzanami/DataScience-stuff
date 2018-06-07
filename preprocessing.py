@@ -14,26 +14,38 @@ DryLoopA2 = "Delestage_Actif_0.BC - State"
 K01 = "Delestage_Actif_0.MC - Cmd"
 K02 = "Delestage_Actif_0.BC - Cmd"
 PowerPV = "PV_1 - P"
-PowerBattery = "DC Sys.Batt.Out - P"
 Temperature = "PV_1 - Temp"
 Soc = "DC Sys.Batt - SoC"
+PowerOut = "DC Sys.Batt.Out - P"
 Irradiation = "Solar_Rad - W/m2"
 PowerEol1 = "Eol_1 - P"
 PowerEol2 = "Eol_2 - P"
+PowerServiceMC = "Load_1.MC - P"
+PowerServiceBC = "Load_1.BC - P"
 
 data_site_usefull_columns = ["Date",
                              DryLoopA1,
                              DryLoopA2,
-                             # K01,
-                             # K02,
                              PowerPV,
-                             PowerBattery,
                              Temperature,
                              Soc,
+                             PowerOut,
                              Irradiation,
-                             # PowerEol1,
-                             # PowerEol2
+                             PowerServiceMC,
+                             PowerServiceBC
                              ]
+
+def check_timeindex(df):
+    diff = (df.index[-1] - df.index[0])
+    days, seconds = diff.days, diff.seconds
+    hours = (days * 24 + seconds // 3600)+1
+    if(hours == len(df)):
+
+        return "All date are ok"
+    else:
+        range = pd.date_range(df.index[0], df.index[-1], freq='H')
+        diff_range = [x for x in range if x not in df.index]
+        return pd.Series(diff_range)
 
 def get_all_data_site():
     path =r'data_site_madagascar/' # use your path
@@ -68,7 +80,7 @@ def prepare_date(data_site, features):
     return data_to_plot
 
 
-def summary_missing_value(data_not_cleaned):
+def summary_missing_value(data_not_cleaned,PowerPV):
     '''
     Calculate the missing values related to the dataframe and plot the percentage / total values
     '''
@@ -90,14 +102,14 @@ def summary_missing_value(data_not_cleaned):
     return summary_missing_dict_sorted
 
 
-def clean_data(data_prepared):
+def clean_data(data_prepared,PowerPV):
     '''
     * Clean the dataframe by replacing the missing value in the off_hour(no sun) by '0'
     * Deleting the rows with missing values for the on_hour(sun) and the the abberant data within a threshold eg : 50
     '''
     print("Début du nettoyage de donnée \r \r")
     df_tmp = data_prepared.copy()
-    summary_value = summary_missing_value(df_tmp)
+    summary_value = summary_missing_value(df_tmp,PowerPV)
     df_tmp["hour"] = df_tmp.index.hour
     list_off_hour = [x for x in summary_value.keys() if summary_value[
         x] == 100]  # off_hours are hours without sun, so there is no data in that range of hours
@@ -151,17 +163,17 @@ def clean_data(data_prepared):
     return df_tmp
 
 
-def plot_data(data_to_plot, features, mode=1):
+def plot_data(data_to_plot, features,number_features, mode=1):
     '''
       Plot the dataframe eg : PowerPV/Date possible withing a specific month eg: 2018-01 data_to_plot['2018-01']
       mode : 0 = plot each column in separate plots
              1 = plot the columns on the same plot
     '''
     if (mode == 0):
-        fig, axes = plt.subplots(nrows=len(features), ncols=1, sharex=True)
+        fig, axes = plt.subplots(nrows=number_features, ncols=1, sharex=True)
         x = data_to_plot.index
         # for i_feature in features[1:]:
-        for ax, feature in zip(axes.flat, features):
+        for ax, feature in zip(axes.flat, features[:number_features]):
             ax.plot(x, data_to_plot[feature])  # ,label=str(i_feature))
             ax.tick_params(axis='x', rotation=70)
             ax.set_title(str(feature))

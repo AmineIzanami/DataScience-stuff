@@ -55,6 +55,18 @@ def get_data_site(session,site_id,granularity,start_date,end_date):
 def timestamp_date(timestamp,madatz):
     return datetime.datetime.fromtimestamp(timestamp,tz=madatz).strftime('%Y-%m-%d:%H')
 
+
+def get_subscribers():
+    url = "http://" + server + port + "/dashboard/SubscribtionInfos.csv"
+    response = requests.get(url, proxies=proxies)
+    reader = response.content
+    # time.sleep(2)
+    all_data = pd.read_csv(io.StringIO(reader.decode('utf-8')), sep=";")
+    all_data.to_csv("subscribers/data_sub.csv",index=False)
+    print("Done")
+
+
+
 if __name__ == "__main__":
     madatz = pytz.timezone('Indian/Antananarivo')  ## Set your timezone
     madatz_now = datetime.datetime.now(madatz)
