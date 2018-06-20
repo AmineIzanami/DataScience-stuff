@@ -1,23 +1,18 @@
-from pandas.io.json import json_normalize
-import requests
-import pandas as pd
+import calendar
 import datetime
 import time
 from pathlib import Path
-import calendar
-import json
-from requests.adapters import HTTPAdapter
-from urllib3 import Retry
-import pytz  ## pip install pytz
-import datetime
+import pandas as pd
+import pytz
+import requests
+from pandas.io.json import json_normalize
 
 proxies = {
     "http": "http://10.66.243.130:8080/"
 }
-
 base_url = "https://api.darksky.net/forecast/629758f8a31408bc57c787adb007f9de/-18.95443,49.1094"
-
 madatz = pytz.timezone('Indian/Antananarivo')
+
 
 
 def get_data_hourly_darksy(start_date):
@@ -33,19 +28,20 @@ def get_data_hourly_darksy(start_date):
     df_json.drop_duplicates(['time'], keep='first', inplace=True)
     df_json.to_csv("Darksky/data_" + timestamp_date(start_date,madatz).split(":")[0]+"_"+str(start_date)+ ".csv")
 
-# def get_data_forecast_darksy():
-#     madatz = pytz.timezone('Indian/Antananarivo')  ## Set your timezone
-#     madatz_now = datetime.datetime.now(madatz)
-#     data_params = {
-#         "units":"si", # take apropriate units celsius
-#     }
-#     response = requests.get(base_url,params=data_params)
-#     reader_json = response.json()
-#     df_json = json_normalize(reader_json['hourly']['data'])
-#     df_json.drop(['icon'], 1, inplace=True)
-#     df_json.set_index(pd.to_datetime(df_json["time"], unit='s',utc=True), inplace=True)
-#     df_json.drop_duplicates(['time'], keep='first', inplace=True)
-#     df_json.to_csv("Darksky_forecast/data_" +str(madatz_now.__str__().split('.')[0].replace(":","_"))+".csv")
+def get_data_forecast_darksy():
+
+    madatz = pytz.timezone('Indian/Antananarivo')  ## Set your timezone
+    madatz_now = datetime.datetime.now(madatz)
+    data_params = {
+        "units":"si", # take apropriate units celsius
+    }
+    response = requests.get(base_url,params=data_params)
+    reader_json = response.json()
+    df_json = json_normalize(reader_json['hourly']['data'])
+    df_json.drop(['icon'], 1, inplace=True)
+    df_json.set_index(pd.to_datetime(df_json["time"], unit='s',utc=True), inplace=True)
+    df_json.drop_duplicates(['time'], keep='first', inplace=True)
+    df_json.to_csv("Darksky_forecast/data_" +str(madatz_now.__str__().split('.')[0].replace(":","_"))+".csv")
 
 
 def timestamp_date(timestamp,madatz=madatz):

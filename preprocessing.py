@@ -102,10 +102,16 @@ def summary_missing_value(data_not_cleaned,PowerPV):
     return summary_missing_dict_sorted
 
 
-def clean_data(data_prepared,PowerPV):
+def clean_data(data_prepared,PowerPV,way_replace):
     '''
     * Clean the dataframe by replacing the missing value in the off_hour(no sun) by '0'
     * Deleting the rows with missing values for the on_hour(sun) and the the abberant data within a threshold eg : 50
+    * way_replace = replace with 0 "zero" with mean "mean"
+            Parameters
+        ----------
+        way_replace : replace with 0 "zero" with mean "mean"
+
+        Returns
     '''
     print("Début du nettoyage de donnée \r \r")
     df_tmp = data_prepared.copy()
@@ -146,7 +152,10 @@ def clean_data(data_prepared,PowerPV):
         with_missing = df_tmp[df_tmp[feature].astype(str).str.contains("Missing", na=False)]
 
         for i_missing in with_missing.index:
-            df_tmp.loc[i_missing, feature] = dict_value_for_missing[i_missing.hour]
+            if way_replace == "mean":
+                df_tmp.loc[i_missing, feature] = dict_value_for_missing[i_missing.hour]
+            if way_replace == "zero":
+              df_tmp.loc[i_missing, feature] = 0
 
         df_tmp[feature] = df_tmp[feature].astype(float)
 
@@ -163,7 +172,7 @@ def clean_data(data_prepared,PowerPV):
     return df_tmp
 
 
-def plot_data(data_to_plot, features,number_features, mode=1):
+def plot_data(data_to_plot, features,title_Plot="Plot", mode=1,**number_features):
     '''
       Plot the dataframe eg : PowerPV/Date possible withing a specific month eg: 2018-01 data_to_plot['2018-01']
       mode : 0 = plot each column in separate plots
@@ -180,18 +189,23 @@ def plot_data(data_to_plot, features,number_features, mode=1):
             ax.grid(True)
             plt.legend(loc='best')
             plt.tight_layout();
+        plt.suptitle(title_Plot, fontsize=16)
+        plt.tight_layout();
         plt.show()
+
     else:
         fig, ax = plt.subplots()
         x = data_to_plot.index
         for i_feature in features:
             plt.plot(x, data_to_plot[i_feature], label=str(i_feature))
         title = "_".join(features[1:])
-        plt.title(title)
+        plt.title(title_Plot)
         plt.xticks(rotation=70);
         plt.tight_layout();
         plt.legend(loc='best')
         fig.canvas.set_window_title(title)
+        plt.suptitle(title_Plot, fontsize=16)
+        plt.tight_layout();
         plt.show()
 
 
@@ -218,20 +232,21 @@ def test_stationarity(timeseries):
      test stationarity of the time serie with the Dickey-Fuller Test and plotting the Rolling Meand and standard deviation
     '''
     # Determing rolling statistics
+
     rolmean = pd.rolling_mean(timeseries, window=24)
     rolstd = pd.rolling_std(timeseries, window=24)
 
     # Plot rolling statistics:
-    orig = plt.plot(timeseries, color='blue', label='Original')
-    mean = plt.plot(rolmean, color='red', label='Rolling Mean')
-    std = plt.plot(rolstd, color='black', label='Rolling Std')
+    plt.plot(timeseries, color='blue', label='Original')
+    plt.plot(rolmean, color='red', label='Rolling Mean')
+    plt.plot(rolstd, color='black', label='Rolling Std')
     plt.legend(loc='best')
     plt.title('PowerPV/Date with Rolling Mean & Standard Deviation')
     plt.xticks(rotation=70)
     plt.ylabel('PV_1 - P');
     plt.xlabel("Time step : 1 hour");
     plt.tight_layout()
-    plt.show(block=False)
+    plt.show()
 
     # Perform Dickey-Fuller test:
     print('Results of Dickey-Fuller Test:')
