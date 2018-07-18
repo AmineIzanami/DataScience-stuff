@@ -96,14 +96,13 @@ def test_all_classfiers(dataframe,feature_to_predict):
         RandomForestRegressor(max_depth=2, random_state=0),
         linear_model.BayesianRidge(),
         linear_model.LassoLars(),
-        linear_model.PassiveAggressiveRegressor(),
         linear_model.TheilSenRegressor()]
-    df_result_metric = pd.DataFrame(index= [ item.__str__().split("(")[0] for item in classifiers],columns=['mse','rmse','r2','correlation'])
+    df_result_metric = pd.DataFrame(index= [ item.__str__().split("(")[0] for item in classifiers]+["NeuralNetwork"],columns=['mse','rmse','r2','correlation'])
     for item in classifiers:
         clf = item
         clf.fit(pd.np.array(X_train), pd.np.array(y_train))
         pred = clf.predict(pd.np.array(X_test))
-        predicted_df = pd.DataFrame({'observed':pd.np.array(y_test[pr.PowerPV]), 'predicted': pred})
+        predicted_df = pd.DataFrame({'observed':pd.np.array(y_test[feature_to_predict]), 'predicted': pred})
         #Metrics for regression
         mse = mean_squared_error(predicted_df.observed, predicted_df.predicted)
         rmse = sqrt(mean_squared_error(predicted_df.observed, predicted_df.predicted))
@@ -128,8 +127,11 @@ def check_timeindex(df):
         diff_range = [x for x in range if x not in df.index]
         return pr.pd.Series(diff_range)
 
+
 ###### forward selection iterate throught all possible combinasion of features and return metric
 def forward_selection_features(data_model):
+    data_model = data_model.copy()
+    feature_to_predict = pr.PowerPV
     combi = []
     features_to_use = [x for x in data_model.columns if x not in [pr.PowerPV]]
     for i in range(1,len(features_to_use)):
@@ -140,24 +142,36 @@ def forward_selection_features(data_model):
     df_result_metric_r2 =[]
     df_result_metric_correlation =[]
     df_result_metric_rmse =[]
+    df_result_metric_forward = pd.DataFrame(index=[','.join(i) for i in all_combi],
+                                    columns=['mse', 'rmse', 'r2', 'correlation'])
+    df_result_metric_forward.sort_index(inplace=True)
     for i in range(len(all_combi)):
         features_validation = data_model[[pr.PowerPV]+all_combi[i]].copy()
         print("Validation for :" + all_combi[i].__str__())
         #test the best model SVR with default hyperparameters
-        X_train, X_test, y_train, y_test = create_dataset(features_validation['2017'])
+        mask_observed = (features_validation.index > '2017') & (features_validation.index < '2018-06-01 00:00:00')
+        data_model_observed = features_validation.loc[mask_observed]
+        X_train, X_test, y_train, y_test = create_dataset(data_model_observed['2017'],feature_to_predict,portion=0.1)
         model = svm.SVR(C=2, epsilon=0).fit(X_train, y_train)
-        part_to_predict = features_validation['2018'].copy()
-        predicted_df = apply_my_model_for_validation(model, part_to_predict)
+        mask_to_predict = (features_validation.index > '2018-06-01 00:00:00')
+        part_to_predict = features_validation.loc[mask_to_predict]
+        predicted_df = apply_my_model_for_validation(model, part_to_predict,feature_to_predict)
         mse = mean_squared_error(predicted_df.observed, predicted_df.predicted)
         mae = mean_absolute_error(predicted_df.observed, predicted_df.predicted)
         r2 = r2_score(predicted_df.observed, predicted_df.predicted)
         correlation = pd.np.corrcoef(pd.np.array(predicted_df.observed), predicted_df.predicted)
         rmse = sqrt(mean_squared_error(predicted_df.observed, predicted_df.predicted))
-        df_result_metric_mse += [mse]
-        df_result_metric_mae += [mae]
-        df_result_metric_r2 += [r2]
-        df_result_metric_correlation += [correlation]
-        df_result_metric_rmse += [rmse]
+        # df_result_metric_mse += [mse]
+        # df_result_metric_mae += [mae]
+        # df_result_metric_r2 += [r2]
+        # df_result_metric_correlation += [correlation]
+        # df_result_metric_rmse += [rmse]
+
+        df_result_metric_forward.loc[','.join(all_combi[i])]['mse'] = mse
+        df_result_metric_forward.loc[','.join(all_combi[i])]['rmse'] = rmse
+        df_result_metric_forward.loc[','.join(all_combi[i])]['r2'] = r2
+        df_result_metric_forward.loc[','.join(all_combi[i])]['correlation'] = correlation[0, 1]
+        df_result_metric_forward_float = df_result_metric_forward.astype(float)
     for i in range(len(df_result_metric_mae)):
         if(df_result_metric_mse[i] == min(df_result_metric_mse)):
             print("min mse : "+str(all_combi[i]))
@@ -169,8 +183,10 @@ def forward_selection_features(data_model):
             print("max r2 : " + str(all_combi[i]))
         # if (df_result_metric_correlation[i] == max(df_result_metric_correlation)):
         #     print("max correlation : " + str(all_combi[i]))
-
-
+#
+# writer = pd.ExcelWriter('output.xlsx')
+# df_result_metric_forward_float.to_excel(writer,'Sheet1')
+# writer.save()
 ###### return p_value and other stats regression
 def stats_models_summary(X_train,X_test,y_train):
     import statsmodels.api as sm
@@ -207,7 +223,7 @@ def keras_try(data_model_featured, feature_to_predict):
     from sklearn.model_selection import cross_val_score
     from sklearn.model_selection import KFold
 
-
+    data_model_featured = data_model_observed
     mask_observed = (data_model_featured.index > '2017') & (data_model_featured.index < '2018-06-03 00:00:00')
 
     data_model_observed = data_model_featured.loc[mask_observed]
@@ -245,6 +261,20 @@ def keras_try(data_model_featured, feature_to_predict):
                                           'observed': pd.np.array(y[feature_to_predict]),
                                           'predicted': pred}
                                       )
+    predicted_df = prediction_to_plot.copy()
+    from sklearn.metrics import mean_squared_error
+    mse = mean_squared_error(predicted_df.observed, predicted_df.predicted)
+    rmse = sqrt(mean_squared_error(predicted_df.observed, predicted_df.predicted))
+    r2 = r2_score(predicted_df.observed, predicted_df.predicted)
+    correlation = pd.np.corrcoef(predicted_df.observed, predicted_df.predicted)
+    # Store Metrics for regression
+
+    result_test_BC.loc["RandomForestRegressor"]['mse'] = 0.006874955
+    result_test_BC.loc["RandomForestRegressor"]['rmse'] = 0.089859954
+    result_test_BC.loc["RandomForestRegressor"]['r2'] = 0.326595
+    result_test_BC.loc["RandomForestRegressor"]['correlation'] = 0.65248778
+
+    result_test_BC_float = result_test_BC.astype(float)
 
     pr.plot_data(prediction_to_plot, prediction_to_plot.columns, 1)
 ############################################################
@@ -319,6 +349,7 @@ def fbprophet_Daily(data_cleaned,feature_to_predict):
     import preprocessing as pr
     # Prophete Facebok
     data_train = data_cleaned.copy()
+
     data_train.reset_index(level=0, inplace=True)
     # Prophet requires columns ds (Date) and y (value)
     data_train = data_train.rename(columns={'Date': 'ds',feature_to_predict: 'y'})
@@ -326,14 +357,14 @@ def fbprophet_Daily(data_cleaned,feature_to_predict):
     # Make the prophet model and fit on the data
     periode = 30
     model = ph.Prophet(changepoint_prior_scale=0.01)
-    mask = (data_train['ds'] > '2017') & (data_train['ds'] < '2018-02')
+    mask = (data_train['ds'] > '2017') & (data_train['ds'] < '2018-06-01 00:00:00')
     model.fit(data_train.loc[mask])
     # Make a future dataframe for 1 month = 30 Day
     future_powerpv = model.make_future_dataframe(periods=periode, freq='D')
     # Make predictions
     forecast_powerpv = model.predict(future_powerpv)
 
-    model.plot_components(forecast_powerpv)
+    # model.plot_components(forecast_powerpv)
     # model.plot_components(forecast_powerpv) # plot the trend
 
     forecast = forecast_powerpv['yhat'].iloc[-periode:]
@@ -348,12 +379,14 @@ def fbprophet_Daily(data_cleaned,feature_to_predict):
 ################################################################################################################
 ###############################----------------------Hourly----------------------###############################
 ################################################################################################################
-def fbprophet_Daily(data_cleaned_hourly,feature_to_predict):
+def fbprophet_hourly(data_cleaned_hourly,feature_to_predict):
     #Prophete Facebok
     import fbprophet as ph
     import pandas as pd
     import preprocessing as pr
+
     data_train_hourly = data_cleaned_hourly.copy()
+
     data_train_hourly.reset_index(level=0, inplace=True)
     # Prophet requires columns ds (Date) and y (value)
     data_train_hourly = data_train_hourly.rename(columns={'Date': 'ds',feature_to_predict: 'y'})
@@ -362,7 +395,7 @@ def fbprophet_Daily(data_cleaned_hourly,feature_to_predict):
     periode_hourly = 3*24
     model = ph.Prophet(changepoint_prior_scale=0.01,yearly_seasonality=False,weekly_seasonality=False,daily_seasonality=True)
     model.add_seasonality(name='daily', period=12, fourier_order=5)
-    mask = (data_train_hourly['ds'] > '2017') & (data_train_hourly['ds'] < '2018')
+    mask = (data_train_hourly['ds'] > '2017') & (data_train_hourly['ds'] < '2018-06-01 00:00:00')
     model.fit(data_train_hourly.loc[mask])
     # Make a future dataframe for 24hour
     future_powerpv = model.make_future_dataframe(periods=periode_hourly, freq='H')
@@ -372,7 +405,7 @@ def fbprophet_Daily(data_cleaned_hourly,feature_to_predict):
 
     # model.plot_components(forecast_powerpv) # plot the trend
     forecast = forecast_powerpv['yhat'].iloc[-periode_hourly:]
-    observed = data_cleaned_hourly[forecast_powerpv.iloc[forecast.index[0],0].__str__():forecast_powerpv.iloc[forecast.index[-1],0].__str__()][pr.PowerPV]
+    observed = data_cleaned_hourly[forecast_powerpv.iloc[forecast.index[0],0].__str__():forecast_powerpv.iloc[forecast.index[-1],0].__str__()][feature_to_predict]
     #Plot observed vs predicted
     # date_start_prediction  = data_train_hourly.loc[len(data_train_hourly.loc[mask])-1,'ds']
     # days = pd.date_range(date_start_prediction + timedelta(hours=1), date_start_prediction + timedelta(hours=periode_hourly), freq='H')

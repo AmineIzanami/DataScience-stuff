@@ -172,7 +172,7 @@ def clean_data(data_prepared,PowerPV,way_replace):
     return df_tmp
 
 
-def plot_data(data_to_plot, features,title_Plot="Plot", mode=1,**number_features):
+def plot_data(data_to_plot, features,title_Plot="Plot", mode=1,number_features=2):
     '''
       Plot the dataframe eg : PowerPV/Date possible withing a specific month eg: 2018-01 data_to_plot['2018-01']
       mode : 0 = plot each column in separate plots
@@ -189,7 +189,7 @@ def plot_data(data_to_plot, features,title_Plot="Plot", mode=1,**number_features
             ax.grid(True)
             plt.legend(loc='best')
             plt.tight_layout();
-        plt.suptitle(title_Plot, fontsize=16)
+        fig.canvas.set_window_title(title_Plot)
         plt.tight_layout();
         plt.show()
 
@@ -199,12 +199,10 @@ def plot_data(data_to_plot, features,title_Plot="Plot", mode=1,**number_features
         for i_feature in features:
             plt.plot(x, data_to_plot[i_feature], label=str(i_feature))
         title = "_".join(features[1:])
-        plt.title(title_Plot)
+        plt.title(title)
         plt.xticks(rotation=70);
-        plt.tight_layout();
         plt.legend(loc='best')
-        fig.canvas.set_window_title(title)
-        plt.suptitle(title_Plot, fontsize=16)
+        fig.canvas.set_window_title(title_Plot)
         plt.tight_layout();
         plt.show()
 
